@@ -16,8 +16,8 @@ import java.io.IOException;
 @RequestMapping("/api/excel")
 public class ExcelController {
 
-    @PostMapping("/upload")
-    public ResponseEntity<byte[]> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
+    @PostMapping("/decrypt")
+    public ResponseEntity<byte[]> decryptFile(@RequestParam("file") MultipartFile file) throws IOException {
         Workbook workbook = new XSSFWorkbook(file.getInputStream());
         Sheet sheet = workbook.getSheetAt(0);
 
@@ -44,4 +44,38 @@ public class ExcelController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(out.toByteArray());
     }
+    @PostMapping("/encrypt")
+    public ResponseEntity<byte[]> encryptFile(@RequestParam("file") MultipartFile file) throws IOException {
+        try {
+            Workbook workbook = new XSSFWorkbook(file.getInputStream());
+            Sheet sheet = workbook.getSheetAt(0);
+
+            for (Row row : sheet) {
+                Cell iinCell = row.getCell(1);
+                if (iinCell != null && iinCell.getCellType() == CellType.STRING) {
+                    String plainIin = iinCell.getStringCellValue();
+                    String encryptedIin = AesEncryptDecrypt.encrypt(plainIin);
+                    if (encryptedIin != null) {
+                        iinCell.setCellValue(encryptedIin);
+                    }
+                }
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            workbook.close();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=encrypted_iin.xlsx");
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(out.toByteArray());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build(); // Return bad request in case of error
+        }
+    }
+
 }
